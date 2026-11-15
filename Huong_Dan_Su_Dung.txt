@@ -1,0 +1,19 @@
+============================================================
+       TIKTOK CHANNEL GROWTH TRACKER - BẢN SẠCH
+============================================================
+
+1. CÀI ĐẶT LẦN ĐẦU (NẾU MÁY MỚI):
+   - Nhấp đúp chuột vào file: Cai_Dat_Thu_Vien.bat
+   - Chờ hệ thống tự động cài đặt các thư viện cần thiết và Chromium.
+
+2. CÁCH KHỞI ĐỘNG TOOL:
+   - Cách 1: Nhấp đúp vào Chay_Tool.bat (Hiện bảng điều khiển)
+   - Cách 2: Nhấp đúp vào Chay_Tool_Khong_Hien_CMD.vbs (Chạy ngầm mượt mà)
+
+3. CÁC TÍNH NĂNG CHÍNH:
+   - "➕ Nhập danh sách ID": Dán danh sách TikTok ID (mỗi ID một dòng).
+   - "⚡ Chạy hôm nay (Các kênh đã chọn)": Quét cập nhật số liệu.
+   - "🚀 Cập nhật toàn bộ": Quét toàn bộ danh sách kênh.
+   - "📊 Xuất file Excel (.xlsx)": Xuất báo cáo chuyên nghiệp.
+   - "⚙️ Cài đặt": Cấu hình Proxy (nếu có), độ trễ, Cookie.
+============================================================

@@ -1,0 +1,27 @@
+# =====================================================================
+# BẢO MẬT DỮ LIỆU CÁ NHÂN (TUYỆT ĐỐI KHÔNG ĐẨY LÊN GITHUB)
+# Không đẩy danh sách kênh, database, cookie, proxy, lịch sử, file Excel
+# =====================================================================
+data/
+exports/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+config.json
+browser_device_state.json
+browser_profile/
+*.xlsx
+*.xls
+*.csv
+
+# Python cache & môi trường ảo
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+*.log
