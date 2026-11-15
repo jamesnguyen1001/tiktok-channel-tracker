@@ -9,6 +9,11 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="ignore")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="ignore")
+
 from playwright.async_api import async_playwright
 from core.config import load_config, DATA_DIR, EXPORTS_DIR
 from core.database import Database

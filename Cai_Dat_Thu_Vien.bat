@@ -61,5 +61,5 @@ echo.
 echo ======================================================================
 echo   CAI DAT HOAN TAT 100%%! DANG TU DONG KHOI DONG TOOL...
 echo ======================================================================
-"%PY_CMD%" app.py
-pause
+start "" wscript.exe //B //Nologo "%~dp0Chay_Tool_Khong_Hien_CMD.vbs"
+exit /b 0

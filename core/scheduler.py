@@ -4,6 +4,7 @@ import subprocess
 from typing import Tuple
 
 TASK_NAME = "TikTokTracker_AutoScan"
+NO_WINDOW_FLAG = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 def get_pythonw_path() -> str:
     """Tìm đường dẫn tới pythonw.exe để chạy ngầm hoàn toàn không hiện cửa sổ đen CMD"""
@@ -36,7 +37,7 @@ def register_windows_task(interval_minutes: int = 30) -> Tuple[bool, str]:
     ]
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore")
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore", creationflags=NO_WINDOW_FLAG)
         if res.returncode == 0:
             return True, f"Đã lên lịch thành công cho Windows tự động quét mỗi {interval_minutes} phút."
         else:
@@ -49,7 +50,7 @@ def remove_windows_task() -> Tuple[bool, str]:
     """Hủy lịch tự động chạy ngầm khỏi Windows Task Scheduler"""
     cmd = ["schtasks", "/delete", "/tn", TASK_NAME, "/f"]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore")
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore", creationflags=NO_WINDOW_FLAG)
         if res.returncode == 0:
             return True, "Đã hủy lịch tự động quét trên Windows."
         else:
@@ -64,7 +65,7 @@ def is_windows_task_registered() -> bool:
     """Kiểm tra xem lịch Windows Task Scheduler hiện có đang bật không"""
     cmd = ["schtasks", "/query", "/tn", TASK_NAME]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore")
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore", creationflags=NO_WINDOW_FLAG)
         return res.returncode == 0
     except Exception:
         return False

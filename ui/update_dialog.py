@@ -199,7 +199,21 @@ class UpdateDialog(QDialog):
 
     def _restart_app(self):
         try:
-            subprocess.Popen([sys.executable] + sys.argv)
+            exe_dir = os.path.dirname(sys.executable)
+            pythonw_exe = os.path.join(exe_dir, "pythonw.exe")
+            target_exe = pythonw_exe if os.path.exists(pythonw_exe) else sys.executable
+            flags = (
+                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+                if os.name == "nt" else 0
+            )
+            subprocess.Popen(
+                [target_exe] + sys.argv,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+                creationflags=flags,
+            )
         except Exception:
             pass
         os._exit(0)

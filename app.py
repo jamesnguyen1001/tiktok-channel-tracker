@@ -8,6 +8,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(BASE_DIR)
 sys.path.insert(0, BASE_DIR)
 
+# Khi chạy bằng pythonw.exe (không có CMD), stdout/stderr là None -> chuyển hướng vào devnull để tránh lỗi print()
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="ignore")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="ignore")
+
+NO_WINDOW_FLAG = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
 REQUIRED_MODULES = [
     ("PyQt6", "PyQt6"),
     ("playwright", "playwright"),
@@ -18,20 +26,62 @@ REQUIRED_MODULES = [
 ]
 
 
+def detach_from_console_if_needed():
+    """
+    Nếu người dùng lỡ chạy bằng python.exe (có cửa sổ CMD đen),
+    tự động chuyển sang chạy ngầm bằng pythonw.exe và đóng ngay cửa sổ CMD.
+    """
+    if os.name != "nt":
+        return
+    exe_name = os.path.basename(sys.executable).lower()
+    if exe_name == "python.exe" and os.environ.get("TIKTOK_TRACKER_NO_DETACH") != "1":
+        pythonw_exe = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+        if os.path.exists(pythonw_exe):
+            try:
+                env = os.environ.copy()
+                env["TIKTOK_TRACKER_NO_DETACH"] = "1"
+                subprocess.Popen(
+                    [pythonw_exe, os.path.abspath(__file__)] + sys.argv[1:],
+                    cwd=BASE_DIR,
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    close_fds=True,
+                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | NO_WINDOW_FLAG,
+                )
+                os._exit(0)
+            except Exception:
+                pass
+        # Fallback: Ẩn trực tiếp cửa sổ Console hiện tại
+        try:
+            import ctypes
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 0)
+        except Exception:
+            pass
+
+
 def ensure_environment():
-    """Tự động kiểm tra và cài đặt các thư viện & trình duyệt còn thiếu trên máy mới"""
+    """Tự động kiểm tra và cài đặt các thư viện & trình duyệt còn thiếu trên máy mới (chạy ngầm không hiện CMD)"""
     missing = []
     for mod_name, pkg_name in REQUIRED_MODULES:
         if importlib.util.find_spec(mod_name) is None:
             missing.append(pkg_name)
 
     if missing:
-        print(f"[Auto-Setup] Dang tu dong cai dat thu vien con thieu: {', '.join(missing)}...")
         req_file = os.path.join(BASE_DIR, "requirements.txt")
         if os.path.exists(req_file):
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", req_file])
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "-r", req_file],
+                creationflags=NO_WINDOW_FLAG
+            )
         else:
-            subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing)
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install"] + missing,
+                creationflags=NO_WINDOW_FLAG
+            )
 
     # Kiểm tra xem trình duyệt Chromium của Playwright đã được tải chưa
     pw_marker = os.path.join(BASE_DIR, "data", ".playwright_ready")
@@ -43,15 +93,18 @@ def ensure_environment():
                 d.startswith("chromium") for d in os.listdir(pw_browsers)
             )
             if not has_chromium:
-                print("[Auto-Setup] Dang tai trinh duyet Chromium cho Playwright (chi chay 1 lan dau)...")
-                subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+                subprocess.check_call(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    creationflags=NO_WINDOW_FLAG
+                )
             with open(pw_marker, "w", encoding="utf-8") as f:
                 f.write("ok")
-        except Exception as e:
-            print(f"[Auto-Setup] Luu y khi kiem tra Playwright: {e}")
+        except Exception:
+            pass
 
 
 def main():
+    detach_from_console_if_needed()
     ensure_environment()
 
     from PyQt6.QtWidgets import QApplication

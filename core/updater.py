@@ -13,6 +13,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from core.config import BASE_DIR, load_config, save_config
 
 VERSION_FILE = os.path.join(BASE_DIR, "version.json")
+NO_WINDOW_FLAG = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 # Các thư mục và file dữ liệu cá nhân TUYỆT ĐỐI KHÔNG BAO GIỜ GHI ĐÈ khi cập nhật
 PROTECTED_PATHS = {
@@ -205,10 +206,10 @@ class UpdateWorker(QThread):
                     "2. Kho GitHub đã được chuyển sang chế độ Public (Công khai) và đã đẩy code lên chưa.",
                     ""
                 )
-            subprocess.run(["git", "remote", "set-url", "origin", git_url], cwd=BASE_DIR, capture_output=True, timeout=10)
-            res = subprocess.run(["git", "pull", "origin", "main", "--rebase"], cwd=BASE_DIR, capture_output=True, text=True, timeout=30)
+            subprocess.run(["git", "remote", "set-url", "origin", git_url], cwd=BASE_DIR, capture_output=True, timeout=10, creationflags=NO_WINDOW_FLAG)
+            res = subprocess.run(["git", "pull", "origin", "main", "--rebase"], cwd=BASE_DIR, capture_output=True, text=True, timeout=30, creationflags=NO_WINDOW_FLAG)
             if res.returncode != 0:
-                res = subprocess.run(["git", "pull", "origin", "master", "--rebase"], cwd=BASE_DIR, capture_output=True, text=True, timeout=30)
+                res = subprocess.run(["git", "pull", "origin", "master", "--rebase"], cwd=BASE_DIR, capture_output=True, text=True, timeout=30, creationflags=NO_WINDOW_FLAG)
             if res.returncode == 0:
                 ver = get_local_version_info().get("version", "Mới nhất")
                 return True, f"🎉 Đã cập nhật thành công qua Git (Phiên bản {ver})!\nDữ liệu cá nhân được bảo toàn 100%.", ver
@@ -258,28 +259,29 @@ class PublishWorker(QThread):
 
             # 2. Khởi tạo Git nếu chưa có
             if not os.path.isdir(os.path.join(BASE_DIR, ".git")):
-                subprocess.run(["git", "init", "-b", "main"], cwd=BASE_DIR, check=True, capture_output=True)
+                subprocess.run(["git", "init", "-b", "main"], cwd=BASE_DIR, check=True, capture_output=True, creationflags=NO_WINDOW_FLAG)
 
-            subprocess.run(["git", "branch", "-M", "main"], cwd=BASE_DIR, capture_output=True)
+            subprocess.run(["git", "branch", "-M", "main"], cwd=BASE_DIR, capture_output=True, creationflags=NO_WINDOW_FLAG)
 
             # Đảm bảo data/ và exports/ không bao giờ nằm trong git index
-            subprocess.run(["git", "rm", "-r", "--cached", "--ignore-unmatch", "data", "exports"], cwd=BASE_DIR, capture_output=True)
+            subprocess.run(["git", "rm", "-r", "--cached", "--ignore-unmatch", "data", "exports"], cwd=BASE_DIR, capture_output=True, creationflags=NO_WINDOW_FLAG)
 
             # Cài đặt remote origin
-            rem = subprocess.run(["git", "remote"], cwd=BASE_DIR, capture_output=True, text=True)
+            rem = subprocess.run(["git", "remote"], cwd=BASE_DIR, capture_output=True, text=True, creationflags=NO_WINDOW_FLAG)
             if "origin" in (rem.stdout or "").splitlines():
-                subprocess.run(["git", "remote", "set-url", "origin", git_url], cwd=BASE_DIR, check=True, capture_output=True)
+                subprocess.run(["git", "remote", "set-url", "origin", git_url], cwd=BASE_DIR, check=True, capture_output=True, creationflags=NO_WINDOW_FLAG)
             else:
-                subprocess.run(["git", "remote", "add", "origin", git_url], cwd=BASE_DIR, check=True, capture_output=True)
+                subprocess.run(["git", "remote", "add", "origin", git_url], cwd=BASE_DIR, check=True, capture_output=True, creationflags=NO_WINDOW_FLAG)
 
             self.progress_msg.emit("📦 Đang đóng gói mã nguồn sạch (không chứa kênh, cookie, proxy)...")
-            subprocess.run(["git", "add", "."], cwd=BASE_DIR, check=True, capture_output=True)
+            subprocess.run(["git", "add", "."], cwd=BASE_DIR, check=True, capture_output=True, creationflags=NO_WINDOW_FLAG)
 
             # Commit
             subprocess.run(
-                ["git", "commit", "-m", f"v{ver_info.get('version', '2.1.0')}: {self.commit_msg}"],
+                ["git", "commit", "-m", f"v{ver_info.get('version', '2.2')}: {self.commit_msg}"],
                 cwd=BASE_DIR,
-                capture_output=True
+                capture_output=True,
+                creationflags=NO_WINDOW_FLAG
             )
 
             self.progress_msg.emit(f"☁️ Đang đẩy bản cập nhật lên GitHub ({slug})...")
@@ -288,7 +290,8 @@ class PublishWorker(QThread):
                 cwd=BASE_DIR,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=60,
+                creationflags=NO_WINDOW_FLAG
             )
             if push_res.returncode == 0:
                 self.publish_finished.emit(
