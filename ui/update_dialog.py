@@ -203,7 +203,7 @@ class UpdateDialog(QDialog):
             pythonw_exe = os.path.join(exe_dir, "pythonw.exe")
             target_exe = pythonw_exe if os.path.exists(pythonw_exe) else sys.executable
             flags = (
-                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
                 if os.name == "nt" else 0
             )
             subprocess.Popen(

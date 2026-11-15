@@ -28,8 +28,8 @@ REQUIRED_MODULES = [
 
 def detach_from_console_if_needed():
     """
-    Nếu người dùng lỡ chạy bằng python.exe (có cửa sổ CMD đen),
-    tự động chuyển sang chạy ngầm bằng pythonw.exe và đóng ngay cửa sổ CMD.
+    Nếu người dùng mở bằng python.exe (có cửa sổ CMD đen),
+    tự động chuyển sang chạy bằng pythonw.exe (chỉ hiện giao diện GUI) và đóng ngay cửa sổ CMD.
     """
     if os.name != "nt":
         return
@@ -48,19 +48,11 @@ def detach_from_console_if_needed():
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     close_fds=True,
-                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | NO_WINDOW_FLAG,
+                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
                 )
                 os._exit(0)
             except Exception:
                 pass
-        # Fallback: Ẩn trực tiếp cửa sổ Console hiện tại
-        try:
-            import ctypes
-            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-            if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 0)
-        except Exception:
-            pass
 
 
 def ensure_environment():
@@ -123,6 +115,17 @@ def main():
 
     window = MainWindow()
     window.show()
+    if os.name == "nt":
+        try:
+            import ctypes
+            hwnd = int(window.winId())
+            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            ctypes.windll.user32.ShowWindow(hwnd, 5)  # SW_SHOW
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
+    window.raise_()
+    window.activateWindow()
 
     sys.exit(app.exec())
 
