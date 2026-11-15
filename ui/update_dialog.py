@@ -31,7 +31,7 @@ class UpdateDialog(QDialog):
         layout.setSpacing(14)
 
         # Header
-        cur_ver = self.ver_info.get("version", "2.1.0")
+        cur_ver = self.ver_info.get("version", "2.2")
         lbl_title = QLabel(f"🚀 Trung Tâm Cập Nhật Tự Động — Phiên bản hiện tại: v{cur_ver}")
         lbl_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #38BDF8;")
         layout.addWidget(lbl_title)

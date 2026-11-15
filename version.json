@@ -1,6 +1,6 @@
 {
-  "version": "2.1.0",
+  "version": "2.2",
   "github_repo": "https://github.com/jamesnguyen1001/tiktok-channel-tracker",
   "branch": "main",
-  "description": "Bản nâng cấp Siêu Tốc + Cột RPM, Dash ($), Ghi chú & Tự động cập nhật GitHub"
+  "description": "Phiên bản 2.2 - Tự động cài đặt môi trường & Hiển thị phiên bản trực tiếp trên thanh công cụ"
 }

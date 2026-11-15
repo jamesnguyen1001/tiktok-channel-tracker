@@ -23,6 +23,7 @@ from ui.add_channel_dialog import AddChannelDialog
 from ui.history_dialog import HistoryDialog
 from ui.settings_dialog import SettingsDialog
 from ui.update_dialog import UpdateDialog
+from core.updater import get_local_version_info
 from ui.styles import DARK_THEME_QSS
 
 COUNTRY_OPTIONS = ["--", "Mỹ", "Anh", "Pháp", "Đức", "Nhật", "Hàn", "Mexico"]
@@ -59,7 +60,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("TikTok Channel Growth Tracker - Quản Lý & Theo Dõi Tăng Trưởng Kênh")
+        self.app_version = get_local_version_info().get("version", "2.2")
+        self.setWindowTitle(f"TikTok Channel Growth Tracker v{self.app_version} - Quản Lý & Theo Dõi Tăng Trưởng Kênh")
         self.resize(1420, 850)
         self.setMinimumSize(1100, 680)
 
@@ -280,7 +282,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(btn_settings)
 
         # Nút Cập nhật phiên bản mới từ GitHub
-        btn_update = QPushButton("🔄 Cập nhật")
+        btn_update = QPushButton(f"🔄 Cập nhật (v{self.app_version})")
         btn_update.setToolTip("Cập nhật phiên bản mới từ GitHub (Giữ nguyên 100% kênh, Cookie, Proxy trên máy)")
         btn_update.setStyleSheet("""
             QPushButton {

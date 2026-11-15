@@ -30,8 +30,8 @@ PROTECTED_PATHS = {
 
 def get_local_version_info() -> dict:
     default_info = {
-        "version": "2.1.0",
-        "github_repo": "",
+        "version": "2.2",
+        "github_repo": "https://github.com/jamesnguyen1001/tiktok-channel-tracker",
         "branch": "main",
         "description": ""
     }
