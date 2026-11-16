@@ -1118,18 +1118,22 @@ class MainWindow(QMainWindow):
 
     def _on_channel_scanned(self, data: dict):
         try:
-            username = data.get("username", "").strip().lstrip("@").lower()
-            stats = data.get("stats") or {}
+            username = data.get("username", "").strip().lstrip("@").split("?")[0].split("/")[0].lower()
+            stats = data.get("stats")
             videos = data.get("videos") or []
-            v_views = [v.get("play_count", 0) for v in videos[:5]]
-            while len(v_views) < 5:
-                v_views.append(0)
-            avg_v = sum(v_views) / max(1, len([v for v in v_views if v > 0])) if any(v > 0 for v in v_views) else 0.0
 
             for row in range(self.table.rowCount()):
                 user_item = self.table.item(row, 3)
-                if user_item and user_item.text().strip().lstrip("@").lower() == username:
+                row_user = user_item.text().strip().lstrip("@").split("?")[0].split("/")[0].lower() if user_item else ""
+                if row_user == username:
                     self.table.blockSignals(True)
+                    now_time = datetime.now().strftime("%H:%M:%S")
+                    if not stats:
+                        err_st = data.get("status", "Lỗi quét")
+                        self._set_cell(row, 21, f"{err_st} ({now_time})", align=Qt.AlignmentFlag.AlignCenter, color=QColor("#EF4444"))
+                        self.table.blockSignals(False)
+                        break
+
                     if stats.get("nickname"):
                         self._set_cell(row, 2, stats["nickname"], bold=True)
                     flw_val = stats.get('follower_count', 0)
@@ -1138,22 +1142,27 @@ class MainWindow(QMainWindow):
                     self._set_cell(row, 9, f"{hrt_val:,}", align=Qt.AlignmentFlag.AlignRight, num_val=hrt_val)
                     vid_val = stats.get('video_count', 0)
                     self._set_cell(row, 11, f"{vid_val:,}", align=Qt.AlignmentFlag.AlignRight, num_val=vid_val)
-                    for vi in range(5):
-                        v_val = v_views[vi]
-                        if v_val >= 10000:
-                            self._set_cell(
-                                row, 12 + vi, f"{v_val:,}",
-                                align=Qt.AlignmentFlag.AlignRight,
-                                color=QColor("#FEF08A"),
-                                bg_color=QColor(234, 179, 8, 85),
-                                bold=True,
-                                num_val=v_val
-                            )
-                        else:
-                            self._set_cell(row, 12 + vi, f"{v_val:,}", align=Qt.AlignmentFlag.AlignRight, num_val=v_val)
-                    self._set_cell(row, 17, f"{avg_v:,.1f}", align=Qt.AlignmentFlag.AlignRight, bold=True, color=QColor("#FBBF24"), num_val=avg_v)
-                    
-                    now_time = datetime.now().strftime("%H:%M:%S")
+
+                    if videos or vid_val == 0:
+                        v_views = [v.get("play_count", 0) for v in videos[:5]]
+                        while len(v_views) < 5:
+                            v_views.append(0)
+                        avg_v = sum(v_views) / max(1, len([v for v in v_views if v > 0])) if any(v > 0 for v in v_views) else 0.0
+                        for vi in range(5):
+                            v_val = v_views[vi]
+                            if v_val >= 10000:
+                                self._set_cell(
+                                    row, 12 + vi, f"{v_val:,}",
+                                    align=Qt.AlignmentFlag.AlignRight,
+                                    color=QColor("#FEF08A"),
+                                    bg_color=QColor(234, 179, 8, 85),
+                                    bold=True,
+                                    num_val=v_val
+                                )
+                            else:
+                                self._set_cell(row, 12 + vi, f"{v_val:,}", align=Qt.AlignmentFlag.AlignRight, num_val=v_val)
+                        self._set_cell(row, 17, f"{avg_v:,.1f}", align=Qt.AlignmentFlag.AlignRight, bold=True, color=QColor("#FBBF24"), num_val=avg_v)
+
                     self._set_cell(row, 21, f"Hoạt động ({now_time})", align=Qt.AlignmentFlag.AlignCenter, color=QColor("#10B981"))
                     self.table.blockSignals(False)
                     break

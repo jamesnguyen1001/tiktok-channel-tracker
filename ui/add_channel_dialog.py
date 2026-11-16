@@ -113,9 +113,13 @@ class AddChannelDialog(QDialog):
 
     def _clean_text(self):
         raw = self.txt_ids.toPlainText()
-        lines = [re.sub(r'https?://(?:www\.)?tiktok\.com/@?', '', line).strip().lstrip('@') 
-                 for line in raw.splitlines()]
-        cleaned = [l for l in lines if l]
+        lines = []
+        for line in raw.splitlines():
+            s = re.sub(r'https?://(?:www\.|m\.|vm\.|vt\.)?tiktok\.com/@?', '', line, flags=re.IGNORECASE).strip()
+            s = s.lstrip('@').split('?')[0].split('#')[0].split('/')[0].strip()
+            if s:
+                lines.append(s)
+        cleaned = lines
         # Deduplicate while preserving order
         seen = set()
         deduped = []

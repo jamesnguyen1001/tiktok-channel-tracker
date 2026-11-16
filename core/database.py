@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import re
 import json
 from datetime import datetime, date
 from typing import List, Dict, Optional, Tuple
@@ -7,6 +8,14 @@ from typing import List, Dict, Optional, Tuple
 from core.config import DATA_DIR
 
 DB_FILE = os.path.join(DATA_DIR, "tiktok_growth.db")
+
+
+def clean_tiktok_username(raw: str) -> str:
+    """Làm sạch TikTok ID: xóa URL, @, và các tham số ?lang=... hoặc /video/..."""
+    s = (raw or "").strip()
+    s = re.sub(r'^https?://(?:www\.|m\.|vm\.|vt\.)?tiktok\.com/@?', '', s, flags=re.IGNORECASE)
+    s = s.lstrip('@').split('?')[0].split('#')[0].split('/')[0].strip().lower()
+    return s
 
 class Database:
     """Quản lý cơ sở dữ liệu SQLite lưu danh sách kênh và lịch sử tăng trưởng hàng ngày"""
@@ -102,6 +111,21 @@ class Database:
 
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_snapshots_date ON snapshots(scan_date)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_snapshots_channel ON snapshots(channel_id)')
+
+            # Tự động chuẩn hóa các username bị dính ?lang=... hoặc / trong database cũ
+            cursor.execute("SELECT id, username, nickname FROM channels WHERE username LIKE '%?%' OR username LIKE '%/%' OR username LIKE '%@%'")
+            dirty_rows = cursor.fetchall()
+            for r in dirty_rows:
+                cid, old_u, old_nick = r[0], r[1], r[2]
+                clean_u = clean_tiktok_username(old_u)
+                if clean_u and clean_u != old_u:
+                    clean_nick = clean_tiktok_username(old_nick) if (old_nick == old_u or '?' in (old_nick or '')) else old_nick
+                    try:
+                        cursor.execute("UPDATE channels SET username = ?, nickname = ? WHERE id = ?", (clean_u, clean_nick, cid))
+                        cursor.execute("UPDATE snapshots SET username = ? WHERE channel_id = ?", (clean_u, cid))
+                    except sqlite3.IntegrityError:
+                        pass
+
             conn.commit()
 
     def add_channels_bulk(self, usernames: List[str], category: str = "Mặc định", country: str = "", phone_code: str = "") -> Tuple[int, int]:
@@ -110,7 +134,7 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             for raw_u in usernames:
-                u = raw_u.strip().lstrip('@').lower()
+                u = clean_tiktok_username(raw_u)
                 if not u:
                     continue
                 try:
@@ -125,13 +149,14 @@ class Database:
         return added, skipped
 
     def update_channel_info(self, username: str, nickname: str, avatar_url: str, bio: str, is_verified: int, status: str = "Hoạt động"):
+        clean_u = clean_tiktok_username(username)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 UPDATE channels 
                 SET nickname = ?, avatar_url = ?, bio = ?, is_verified = ?, status = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE username = ?
-            ''', (nickname, avatar_url, bio, is_verified, status, username.strip().lstrip('@').lower()))
+            ''', (nickname, avatar_url, bio, is_verified, status, clean_u))
             conn.commit()
 
     def update_channel_category(self, channel_id: int, new_category: str):
@@ -269,6 +294,25 @@ class Database:
             ch_row = cursor.fetchone()
             cur_rpm = float(ch_row[0] or 0.0) if ch_row else 0.0
             cur_dash = float(ch_row[1] or 0.0) if ch_row else 0.0
+
+            # Nếu kênh có video (video_count > 0) nhưng lần quét này mạng/proxy bị nghẽn chưa tải kịp danh sách video (v_views toàn 0),
+            # giữ lại số view V1..V5 gần nhất đã có trong DB thay vì ghi đè bằng số 0
+            if stats.get("video_count", 0) > 0 and all(v == 0 for v in v_views):
+                cursor.execute('''
+                    SELECT v1_view, v2_view, v3_view, v4_view, v5_view, avg_views, videos_json
+                    FROM snapshots
+                    WHERE channel_id = ? AND (v1_view > 0 OR v2_view > 0 OR v3_view > 0)
+                    ORDER BY scan_date DESC LIMIT 1
+                ''', (channel_id,))
+                existing_v = cursor.fetchone()
+                if existing_v:
+                    v_views = [existing_v[0], existing_v[1], existing_v[2], existing_v[3], existing_v[4]]
+                    avg_v = float(existing_v[5] or 0.0)
+                    if not videos and existing_v[6]:
+                        try:
+                            videos = json.loads(existing_v[6])
+                        except Exception:
+                            pass
 
             cursor.execute('''
                 INSERT INTO snapshots (

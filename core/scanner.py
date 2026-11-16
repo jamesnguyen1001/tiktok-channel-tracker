@@ -345,12 +345,13 @@ class TikTokScraper:
             return False
 
     async def scan_single_channel_async(self, context, username: str, page=None) -> Tuple[bool, Optional[Dict], Optional[List[Dict]], str]:
-        target_username = username.strip().lstrip('@').lower()
+        target_username = (username or "").strip().lstrip('@').split('?')[0].split('#')[0].split('/')[0].strip().lower()
         if not target_username:
             return False, None, None, "ID không hợp lệ"
 
         stats_data = {}
         videos_data = []
+        item_list_in_flight = 0
         owns_page = page is None
 
         if owns_page:
@@ -391,32 +392,38 @@ class TikTokScraper:
                                 "is_verified": 1 if u.get("verified") else 0
                             })
                 elif "/api/post/item_list" in url:
-                    txt = await response.text()
-                    if txt and txt.strip().startswith("{"):
-                        data = json.loads(txt)
-                        items = data.get("itemList", [])
-                        if items:
-                            seen_ids = {v.get("id") for v in videos_data if v.get("id")}
-                            for it in items:
-                                author = it.get("author", {})
-                                if author and author.get("uniqueId", "").lower() != target_username:
-                                    continue
-                                istats = it.get("stats", {})
-                                v_id = it.get("id", "")
-                                if v_id and v_id in seen_ids:
-                                    continue
-                                if v_id:
-                                    seen_ids.add(v_id)
-                                videos_data.append({
-                                    "id": v_id,
-                                    "desc": it.get("desc", ""),
-                                    "play_count": int(istats.get("playCount", 0)),
-                                    "digg_count": int(istats.get("diggCount", 0)),
-                                    "comment_count": int(istats.get("commentCount", 0)),
-                                    "share_count": int(istats.get("shareCount", 0)),
-                                    "create_time": it.get("createTime", 0),
-                                    "url": f"https://www.tiktok.com/@{target_username}/video/{v_id}" if v_id else ""
-                                })
+                    nonlocal item_list_in_flight
+                    item_list_in_flight += 1
+                    try:
+                        body = await response.body()
+                        txt = body.decode("utf-8", errors="ignore")
+                        if txt and txt.strip().startswith("{"):
+                            data = json.loads(txt)
+                            items = data.get("itemList", [])
+                            if items:
+                                seen_ids = {v.get("id") for v in videos_data if v.get("id")}
+                                for it in items:
+                                    author = it.get("author", {})
+                                    if author and author.get("uniqueId", "").lower() != target_username:
+                                        continue
+                                    istats = it.get("stats", {})
+                                    v_id = it.get("id", "")
+                                    if v_id and v_id in seen_ids:
+                                        continue
+                                    if v_id:
+                                        seen_ids.add(v_id)
+                                    videos_data.append({
+                                        "id": v_id,
+                                        "desc": it.get("desc", ""),
+                                        "play_count": int(istats.get("playCount", 0)),
+                                        "digg_count": int(istats.get("diggCount", 0)),
+                                        "comment_count": int(istats.get("commentCount", 0)),
+                                        "share_count": int(istats.get("shareCount", 0)),
+                                        "create_time": it.get("createTime", 0),
+                                        "url": f"https://www.tiktok.com/@{target_username}/video/{v_id}" if v_id else ""
+                                    })
+                    finally:
+                        item_list_in_flight = max(0, item_list_in_flight - 1)
             except Exception:
                 pass
 
@@ -502,18 +509,24 @@ class TikTokScraper:
             if not stats_data:
                 await _try_extract_dom_stats()
 
-            # 3. Smart Early-Exit: Chờ thông minh danh sách video (polling 50ms/lần)
+            # 3. Smart Early-Exit: Chờ thông minh danh sách video (polling 50ms/lần, thoát ngay khi đủ 5 video)
             vid_count = stats_data.get("video_count", 1) if stats_data else 1
             if vid_count > 0:
                 target_vids = min(5, vid_count) if stats_data and vid_count > 0 else 5
 
-                # Chờ nhanh tối đa 1.2s (thường API item_list trả về sau 0.3s - 0.7s)
-                for _ in range(24):
+                # Pha 1: Chờ tối đa 3.8s (nếu mạng nhanh 0.4s đã có thì thoát ngay ở 0.4s)
+                for _ in range(76):
                     if len(videos_data) >= target_vids:
                         break
                     await asyncio.sleep(0.05)
 
-                # Chỉ khi sau 1.2s vẫn chưa có video mới cuộn trang & kiểm tra Captcha
+                # Nếu gói tin /api/post/item_list đang tải dở (in-flight), chờ tải nốt để không bị ngắt giữa chừng
+                for _ in range(60):
+                    if len(videos_data) >= target_vids or item_list_in_flight == 0:
+                        break
+                    await asyncio.sleep(0.05)
+
+                # Pha 2: Nếu vẫn chưa có video -> Cuộn trang kích hoạt lazy-load & Giải Captcha (nếu có)
                 if len(videos_data) == 0:
                     try:
                         await page.mouse.wheel(0, 600)
@@ -522,8 +535,13 @@ class TikTokScraper:
 
                     await self.solve_rotate_captcha_if_present(page)
 
-                    for _ in range(24):
+                    for _ in range(80):
                         if len(videos_data) >= 1:
+                            break
+                        await asyncio.sleep(0.05)
+
+                    for _ in range(50):
+                        if len(videos_data) >= 1 or item_list_in_flight == 0:
                             break
                         await asyncio.sleep(0.05)
 
@@ -1044,7 +1062,8 @@ class ScanWorker(QThread):
                         page = await context.new_page()
                         channels_on_tab = 0
 
-                    while attempt <= retry_count and not success and self.is_running:
+                    max_attempts = max(1, retry_count) + 1
+                    while attempt < max_attempts and self.is_running:
                         attempt += 1
                         try:
                             if page.is_closed():
@@ -1052,27 +1071,28 @@ class ScanWorker(QThread):
                                 channels_on_tab = 0
                             success, stats, videos, msg = await scraper.scan_single_channel_async(context, username, page=page)
                             channels_on_tab += 1
-                            if success and stats:
+                            has_needed_videos = (not stats) or (stats.get("video_count", 0) == 0) or (len(videos) > 0)
+                            if success and stats and has_needed_videos:
                                 break
-                            elif attempt <= retry_count:
-                                # Khi gặp lỗi ở lần thử đầu, làm mới Tab sạch trước khi thử lại
+                            elif attempt < max_attempts:
+                                # Khi gặp lỗi hoặc thiếu danh sách view ở lần thử đầu, làm mới Tab sạch trước khi thử lại
                                 try:
                                     await page.close()
                                 except Exception:
                                     pass
                                 page = await context.new_page()
                                 channels_on_tab = 0
-                                await asyncio.sleep(0.4)
+                                await asyncio.sleep(0.5)
                         except Exception as e:
                             msg = str(e)
-                            if attempt <= retry_count:
+                            if attempt < max_attempts:
                                 try:
                                     await page.close()
                                 except Exception:
                                     pass
                                 page = await context.new_page()
                                 channels_on_tab = 0
-                                await asyncio.sleep(0.4)
+                                await asyncio.sleep(0.5)
 
                     async with lock:
                         if success and stats:
